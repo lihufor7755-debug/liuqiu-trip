@@ -81,6 +81,73 @@ window.TRIP = (function(){
     saveCache(); schedulePush();
   }
 
+  /* ───────── 站的順序 ─────────
+     順序由 data.seq 決定。拖曳時取前後兩者的中間值，只改被拖的那一筆，
+     這樣「最後由○○修改」不會整天的卡片全被蓋掉。
+     中間值擠不下時（極少見）才整天重編號。 */
+  function stopsOfDay(dayId){
+    return all("stop").filter(function(r){ return r.data.dayId === dayId; });
+  }
+  function writeSeq(rec, seq){
+    if(rec.data.seq === seq) return;
+    var d = JSON.parse(JSON.stringify(rec.data));
+    d.seq = seq;
+    put("stop", rec.item_id, d);
+  }
+  /* 把 stopId 移到 beforeId 之前；beforeId 為 null 代表移到最後 */
+  function placeStop(dayId, stopId, beforeId){
+    var rec = recs[key("stop", stopId)];
+    if(!rec || rec.deleted) return;
+    var list = stopsOfDay(dayId).filter(function(r){ return r.item_id !== stopId; });
+    var idx = list.length;
+    if(beforeId){
+      for(var i=0;i<list.length;i++) if(list[i].item_id === beforeId){ idx = i; break; }
+    }
+    var prev = idx > 0 ? list[idx-1].data.seq : null;
+    var next = idx < list.length ? list[idx].data.seq : null;
+    var mid;
+    if(prev === null && next === null) mid = nextSeq();
+    else if(prev === null) mid = next - 1000;
+    else if(next === null) mid = prev + 1000;
+    else mid = (prev + next) / 2;
+
+    if(prev !== null && next !== null && !(mid > prev && mid < next)){
+      var order = list.slice();
+      order.splice(idx, 0, rec);
+      order.forEach(function(r, i){ writeSeq(r, (i+1) * 1000); });
+      return;
+    }
+    writeSeq(rec, mid);
+  }
+  /* 有填時間的站，該插在誰前面 */
+  function slotForTime(dayId, time, selfId){
+    if(!time) return undefined;              // 沒填時間 → 不自動插
+    var list = stopsOfDay(dayId).filter(function(r){
+      return r.item_id !== selfId && r.data.time;
+    });
+    for(var i=0;i<list.length;i++) if(list[i].data.time > time) return list[i].item_id;
+    return null;                             // 比誰都晚 → 最後
+  }
+  /* 整天照時間重排 */
+  function sortDayByTime(dayId){
+    var list = stopsOfDay(dayId).slice();
+    list.sort(function(a,b){
+      var at = a.data.time || "", bt = b.data.time || "";
+      if(at && bt) return at < bt ? -1 : (at > bt ? 1 : a.data.seq - b.data.seq);
+      if(at) return -1;
+      if(bt) return 1;
+      return a.data.seq - b.data.seq;
+    });
+    list.forEach(function(r, i){ writeSeq(r, (i+1) * 1000); });
+  }
+  /* 時間是不是亂掉了（用來決定要不要顯示「照時間重排」） */
+  function timeOrderBroken(dayId){
+    var timed = stopsOfDay(dayId).filter(function(r){ return r.data.time; });
+    for(var i=1;i<timed.length;i++)
+      if(timed[i].data.time < timed[i-1].data.time) return true;
+    return false;
+  }
+
   /* ───────── 檢視模型（畫面用的巢狀形狀） ───────── */
   function view(){
     var days = all("day").map(function(r){
@@ -413,6 +480,8 @@ window.TRIP = (function(){
   return {
     boot:boot, startPolling:startPolling, poll:poll, flush:flush,
     view:view, get:get, all:all, put:put, remove:remove,
+    placeStop:placeStop, slotForTime:slotForTime,
+    sortDayByTime:sortDayByTime, timeOrderBroken:timeOrderBroken,
     onChange:onChange, onRemoteChange:onRemoteChange, shareLink:shareLink,
     get tripId(){ return tripId; },
     get status(){ return status; },

@@ -367,3 +367,23 @@ input,select,textarea{font-family:inherit;font-size:16px;color:var(--ink)}
   .ribbon-name{font-size:12px;max-width:6.2em}
   .ribbon-seg::before,.ribbon-seg::after{width:10px}
 }
+
+/* ───────── 拖曳調整順序 ───────── */
+.card-top{display:flex;align-items:stretch}
+.grip{flex:0 0 auto;width:24px;display:grid;place-items:center;
+  color:var(--ink-faint);cursor:grab;touch-action:none;
+  border-right:1px solid transparent}
+.grip:hover{color:var(--ink);background:var(--land)}
+.grip:active{cursor:grabbing}
+.card-top .card-head{flex:1;min-width:0;padding-left:8px}
+.stopcard.dragging{opacity:.35}
+body.dragging-now{user-select:none;-webkit-user-select:none}
+body.dragging-now .grip{cursor:grabbing}
+.drop-line{height:0;border-top:2px solid var(--accent);margin:2px 0;
+  border-radius:2px;position:relative}
+.drop-line::before{content:"";position:absolute;left:-1px;top:-4px;
+  width:7px;height:7px;border-radius:50%;background:var(--accent)}
+
+.fixrow{display:flex;align-items:center;gap:10px;margin:12px 0 0}
+.fixhint{font-size:12px;color:var(--warn)}
+.fixrow .ghost{border-color:var(--warn);color:var(--warn)}

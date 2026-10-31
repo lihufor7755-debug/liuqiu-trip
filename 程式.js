@@ -309,6 +309,10 @@
       '<span class="spacer"></span><span>'+esc(d.date.replace(/-/g,"."))+
       '（'+esc(d.weekday)+'）</span></div></div>';
 
+    if(T.timeOrderBroken(d.id)){
+      h += '<div class="fixrow"><button class="ghost" data-sorttime="'+d.id+'">'+
+        '↕ 照時間重排</button><span class="fixhint">時間順序亂掉了</span></div>';
+    }
     h += '<div class="timeline">';
     if(!n){
       h += '<div class="panel"><div class="empty">這天還全是空白。<br>'+
@@ -341,7 +345,15 @@
 
   function renderStop(s, seq, dayId){
     var isOpen = !!openStops[s.id];
-    var h = '<div class="stopcard'+(isOpen?" open":"")+'" data-stop="'+s.id+'">';
+    var h = '<div class="stopcard'+(isOpen?" open":"")+'" data-stop="'+s.id+
+      '" data-day="'+dayId+'">';
+    h += '<div class="card-top">';
+    h += '<span class="grip" data-grip="'+s.id+'" title="按住拖曳可調整順序" '+
+         'role="button" tabindex="-1" aria-label="拖曳調整順序">'+
+         '<svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor" '+
+         'aria-hidden="true"><circle cx="4" cy="4" r="1.3"/><circle cx="8" cy="4" r="1.3"/>'+
+         '<circle cx="4" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/>'+
+         '<circle cx="4" cy="12" r="1.3"/><circle cx="8" cy="12" r="1.3"/></svg></span>';
     h += '<button class="card-head" data-toggle="'+s.id+'" aria-expanded="'+isOpen+'">'+
       '<span class="tbar" style="background:var(--t-'+esc(s.type)+')"></span>'+
       '<span class="seq num">'+seq+'</span>'+
@@ -353,6 +365,7 @@
       '<span class="chev"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" '+
       'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+
       '<path d="M4 2.5 8 6l-4 3.5"/></svg></span></button>';
+    h += '</div>';
 
     if(isOpen){
       h += '<div class="card-body">';
@@ -467,6 +480,9 @@
           data.leg     = {mode:g("leg.mode"), duration:g("leg.duration").trim(),
                           fare:num("leg.fare")};
           T.put("stop", id, data);
+          /* 有填時間就自動插到時間對的位置，不要丟到最後面 */
+          var slot = T.slotForTime(dayId, data.time, id);
+          if(slot !== undefined) T.placeStop(dayId, id, slot);
           toast(isNew ? "加好了" : "存起來了");
           close(); render();
         };
@@ -645,7 +661,7 @@
       "[data-todo-tick],[data-pack-tick],[data-del-todo],[data-edit-todo],[data-add-todo],"+
       "[data-add-exp],[data-edit-exp],[data-del-exp],[data-add-member],[data-del-member],"+
       "[data-add-notice],[data-del-notice],[data-add-pack],[data-del-pack],"+
-      "[data-theme],[data-whoami],[data-share]") : null;
+      "[data-theme],[data-whoami],[data-share],[data-sorttime]") : null;
     if(!t || !V) return;
     var g = function(k){ return t.getAttribute(k); };
     var p = V.prep;
@@ -654,6 +670,7 @@
     if(g("data-whoami") !== null){ askMe(true); return; }
     if(g("data-share") !== null){ shareSheet(false); return; }
     if(g("data-theme") !== null){ cycleTheme(); return; }
+    if(g("data-sorttime")){ T.sortDayByTime(g("data-sorttime")); toast("照時間排好了"); render(); return; }
 
     /* 站 */
     if(g("data-toggle")){
@@ -783,6 +800,85 @@
     }
     if(el.classList && el.classList.contains("leg")){ ev.preventDefault(); el.click(); }
   });
+
+  /* ───────── 拖曳調整順序 ─────────
+     不用 HTML5 drag：那個在觸控裝置上根本不會觸發。
+     只在握把上抓（握把 touch-action:none），其他地方照常捲動。 */
+  var drag = null;
+
+  function cardsInTimeline(){
+    return [].slice.call(document.querySelectorAll(".timeline .stopcard"));
+  }
+
+  document.addEventListener("pointerdown", function(e){
+    var grip = e.target.closest && e.target.closest("[data-grip]");
+    if(!grip) return;
+    var card = grip.closest(".stopcard");
+    if(!card) return;
+    var cards = cardsInTimeline();
+    if(cards.length < 2) return;             // 只有一張不用拖
+
+    e.preventDefault();
+    grip.setPointerCapture(e.pointerId);
+
+    var line = document.createElement("div");
+    line.className = "drop-line";
+    drag = {id:card.getAttribute("data-stop"), dayId:card.getAttribute("data-day"),
+            card:card, grip:grip, line:line, beforeId:null, moved:false,
+            y:e.clientY, raf:0};
+    card.classList.add("dragging");
+    document.body.classList.add("dragging-now");
+    autoScroll();
+  });
+
+  /* 拖到畫面邊緣就自動捲動。握把是 touch-action:none，
+     手機上拖的時候沒辦法自己捲，沒有這個就拖不過一個螢幕。 */
+  function autoScroll(){
+    if(!drag) return;
+    var EDGE = 90, MAX = 18;
+    var y = drag.y, h = window.innerHeight, dy = 0;
+    if(y < EDGE)            dy = -MAX * (1 - y / EDGE);
+    else if(y > h - EDGE)   dy =  MAX * (1 - (h - y) / EDGE);
+    if(dy) window.scrollBy(0, dy);
+    drag.raf = requestAnimationFrame(autoScroll);
+  }
+
+  document.addEventListener("pointermove", function(e){
+    if(!drag) return;
+    drag.moved = true;
+    drag.y = e.clientY;
+    var cards = cardsInTimeline(), before = null, target = null;
+    for(var i=0;i<cards.length;i++){
+      if(cards[i] === drag.card) continue;
+      var r = cards[i].getBoundingClientRect();
+      if(e.clientY < r.top + r.height/2){
+        before = cards[i].getAttribute("data-stop");
+        target = cards[i];
+        break;
+      }
+    }
+    drag.beforeId = before;
+    if(target) target.parentNode.insertBefore(drag.line, target);
+    else {
+      var last = cards[cards.length-1];
+      if(last === drag.card) last = cards[cards.length-2];
+      if(last) last.parentNode.insertBefore(drag.line, last.nextSibling);
+    }
+  });
+
+  function endDrag(){
+    if(!drag) return;
+    var d = drag; drag = null;
+    if(d.raf) cancelAnimationFrame(d.raf);
+    d.card.classList.remove("dragging");
+    document.body.classList.remove("dragging-now");
+    if(d.line.parentNode) d.line.parentNode.removeChild(d.line);
+    if(!d.moved) return;
+    T.placeStop(d.dayId, d.id, d.beforeId);
+    render();
+  }
+  document.addEventListener("pointerup", endDrag);
+  document.addEventListener("pointercancel", endDrag);
 
   /* ───────── 主題 ───────── */
   var TKEY = "小琉球行程-主題";
