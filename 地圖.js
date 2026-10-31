@@ -218,51 +218,33 @@ window.MAP = (function(){
     });
 
     svg += '</svg>';
-    return {svg:svg, verdict:verdict(pts), count:pts.length};
+    return {html:svg, verdict:verdict(pts), count:pts.length};
   }
 
-  /* 航段帶：不在島上的日子（高雄、回程），畫一條由站點串起的旅程線 */
+  /* 航段帶：不在島上的日子（高雄、回程）。
+     用一般 HTML 畫，不用 SVG——SVG 會跟著版面等比放大，字就變成巨無霸。 */
   function ribbon(stops, from){
-    var names = [from || "出發"].concat(stops.map(function(s){
-      return s.name || "（未命名）";
-    }));
-    var modes = [null].concat(stops.map(function(s){
-      return (s.leg && s.leg.mode) || null;
-    }));
-    var n = names.length;
-    var W = 220, pad = 34, y = 54;
-    var step = n > 1 ? (W - pad*2) / (n-1) : 0;
-    var H = 108;
+    var pts = [{name:(from || "出發"), start:true, mode:null}];
+    stops.forEach(function(s){
+      pts.push({name:(s.name || "（未命名）"),
+                mode:(s.leg && s.leg.mode) || null});
+    });
 
-    var svg = '<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="當日路線：'+
-      esc(names.join(" 到 "))+'">';
-    svg += '<defs><pattern id="swell2" width="22" height="14" patternUnits="userSpaceOnUse">'+
-      '<path d="M0 10 q5.5 -5 11 0 t11 0" fill="none" stroke="var(--sea-deep)" '+
-      'stroke-width=".7" opacity=".55"/></pattern></defs>';
-    svg += '<rect width="'+W+'" height="'+H+'" fill="url(#swell2)"/>';
-    svg += '<path d="M'+pad+','+y+' H'+(W-pad)+'" stroke="var(--land-edge)" '+
-      'stroke-width="1.4" stroke-dasharray="1 3.2" stroke-linecap="round"/>';
-
-    for(var i=0;i<n;i++){
-      var x = pad + step*i;
-      var last = i === n-1;
-      svg += '<circle cx="'+x.toFixed(1)+'" cy="'+y+'" r="'+(last?5.6:4.2)+'" fill="'+
-        (i===0 ? "var(--land-edge)" : "var(--accent)")+'"/>';
-      if(i>0) svg += '<text x="'+x.toFixed(1)+'" y="'+(y+3)+'" text-anchor="middle" '+
-        'class="map-seq" style="font-size:7px">'+i+'</text>';
-      var up = i % 2 === 0;
-      svg += '<text x="'+x.toFixed(1)+'" y="'+(up ? y-12 : y+20)+'" text-anchor="middle" '+
-        'class="map-label'+(i>0?" on":"")+'">'+esc(clip(names[i],6))+'</text>';
-      if(i>0 && modes[i]){
-        var mx = pad + step*(i-0.5);
-        svg += '<g transform="translate('+(mx-8).toFixed(1)+','+(y-26)+')" '+
-          'color="var(--ink-soft)">'+icon(modes[i])+'</g>';
+    var h = '<div class="ribbon"><div class="ribbon-rail">';
+    pts.forEach(function(p, i){
+      if(i > 0){
+        h += '<span class="ribbon-seg" title="'+esc(p.mode || "還沒填")+'">'+
+             '<span class="ribbon-ico">'+icon(p.mode || "")+'</span></span>';
       }
-    }
-    svg += '</svg>';
-    var v = n<=1 ? "今天還沒有落點"
-      : (names[0]+" → "+names[n-1]);
-    return {svg:svg, verdict:v, count:n-1};
+      h += '<span class="ribbon-stop'+(p.start ? " start" : "")+'">'+
+           '<span class="ribbon-dot">'+(p.start ? "" : i)+'</span>'+
+           '<span class="ribbon-name">'+esc(p.name)+'</span></span>';
+    });
+    h += '</div></div>';
+
+    var v = pts.length <= 1 ? "今天還沒有落點"
+          : (pts[0].name + " → " + pts[pts.length-1].name);
+    return {html:h, verdict:v, count:pts.length-1};
   }
 
   function clip(s,n){ s = String(s); return s.length>n ? s.slice(0,n)+"…" : s; }

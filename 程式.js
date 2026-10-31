@@ -304,7 +304,7 @@
         (total>0 ? esc(money(total)) : "—")+'</div></div></div>';
 
     var map = d.onIsland ? M.island(d.stops) : M.ribbon(d.stops, d.from);
-    h += '<div class="mapwrap'+(d.onIsland?" island":"")+'">'+map.svg+
+    h += '<div class="mapwrap'+(d.onIsland?" island":"")+'">'+map.html+
       '<div class="maplegend"><span class="verdict">'+esc(map.verdict)+'</span>'+
       '<span class="spacer"></span><span>'+esc(d.date.replace(/-/g,"."))+
       '（'+esc(d.weekday)+'）</span></div></div>';
@@ -331,7 +331,7 @@
     if(L.mode) bits.push(esc(L.mode));
     if(L.duration) bits.push(esc(L.duration));
     if(L.fare !== null && L.fare !== undefined && L.fare !== "") bits.push(esc(money(L.fare)));
-    return '<div class="leg'+(has?"":" empty")+'" data-edit-stop="'+s.id+'" data-day="'+dayId+
+    return '<div class="leg'+(has?"":" noleg")+'" data-edit-stop="'+s.id+'" data-day="'+dayId+
       '" role="button" tabindex="0" title="編輯這一段">'+
       '<span class="ico">'+M.icon(L.mode||"")+'</span>'+
       '<span class="txt"><span class="route-txt">'+esc(prev)+' → '+esc(s.name||"（未命名）")+
