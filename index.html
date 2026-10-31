@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>小琉球四天三夜</title>
+<meta name="description" content="2026/11/26–11/29 小琉球共編行程">
+<meta name="color-scheme" content="light dark">
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="樣式.css">
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <h1>小琉球四天三夜</h1>
+    <span class="sub num">2026.11.26 — 11.29</span>
+    <span class="spacer"></span>
+    <button class="ghost pill" id="sync-pill" data-share>載入中…</button>
+    <button class="ghost" id="whoami" data-whoami>你是誰？</button>
+    <button class="ghost" data-share>分享</button>
+    <button class="ghost" id="theme-btn" data-theme>◐ 跟著系統</button>
+  </header>
+
+  <nav class="route" id="route" aria-label="航線"></nav>
+
+  <main id="app"></main>
+
+</div>
+
+<!-- 負責人欄位的下拉建議：同行名單 -->
+<datalist id="member-list"></datalist>
+
+<script src="設定.js"></script>
+<script src="同步.js"></script>
+<script src="地圖.js"></script>
+<script src="資料.js"></script>
+<script src="程式.js"></script>
+</body>
+</html>
